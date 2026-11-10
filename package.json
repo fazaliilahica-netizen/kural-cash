@@ -1,0 +1,13 @@
+{
+  "name": "kural-cash",
+  "version": "1.0.0",
+  "description": "The get-paid agent for people who never had an accounts department. Bilingual (Tamil/English) voice-first invoicing on PayPal Invoicing v2 with a fail-closed money policy and Gemini assist.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --env-file=.env server.js",
+    "test": "node tests.js",
+    "smoke": "node --env-file=.env scripts/sandbox-smoke.js"
+  },
+  "engines": { "node": ">=18" },
+  "license": "MIT"
+}

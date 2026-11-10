@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kural Cash - get paid in your own language</title>
+<style>
+  :root { --ink:#1c2530; --mut:#5b6876; --line:#dfe6ee; --ok:#0c7a4b; --warn:#9a5b00; --bad:#b3261e; --brand:#0a4d8c; }
+  * { box-sizing:border-box; font-family:-apple-system,"Segoe UI",Roboto,Noto Sans,Tamil Sangam MN,sans-serif; }
+  body { margin:0; background:#f5f8fb; color:var(--ink); }
+  header { background:var(--brand); color:#fff; padding:14px 20px; }
+  header h1 { margin:0; font-size:19px; }
+  header p { margin:2px 0 0; font-size:12px; opacity:.85; }
+  main { max-width:880px; margin:18px auto; padding:0 14px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
+  .card h2 { margin:0 0 10px; font-size:15px; }
+  textarea { width:100%; min-height:64px; font-size:16px; padding:10px; border:1px solid var(--line); border-radius:8px; }
+  button { cursor:pointer; border:0; border-radius:8px; padding:9px 14px; font-size:14px; background:var(--brand); color:#fff; }
+  button.ghost { background:#eef3f8; color:var(--ink); }
+  button:disabled { opacity:.5; cursor:default; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+  .pill { display:inline-block; font-size:11px; padding:2px 8px; border-radius:99px; background:#eef3f8; color:var(--mut); }
+  .pill.ok { background:#e3f5ec; color:var(--ok); } .pill.warn { background:#fdf1de; color:var(--warn); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:7px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
+  input, select { font-size:14px; padding:7px; border:1px solid var(--line); border-radius:7px; }
+  .field { margin:8px 0; } .field label { display:block; font-size:12px; color:var(--mut); margin-bottom:3px; }
+  .bad { color:var(--bad); font-size:13px; } .muted { color:var(--mut); font-size:12px; }
+  .rem { background:#f8fafc; border:1px dashed var(--line); border-radius:8px; padding:10px; margin-top:8px; font-size:13px; white-space:pre-wrap; }
+  .utter { font-size:12px; color:var(--mut); font-style:italic; }
+  #statusbar { font-size:12px; color:var(--mut); margin-bottom:10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kural Cash</h1>
+  <p>The get-paid agent for people who never had an accounts department. Speak in Tamil or English - it never invents an amount, a currency, or a recipient.</p>
+</header>
+<main>
+  <div id="statusbar">loading…</div>
+
+  <div class="card">
+    <h2>1 · Say the invoice <span class="pill" id="aiPill">…</span></h2>
+    <textarea id="cmd" placeholder='e.g. "ரமேஷ்-க்கு வெப்சைட் வேலைக்கு 1500 CAD இன்வாய்ஸ் அனுப்பு" or "invoice Meera 80 dollars CAD logo design"'></textarea>
+    <div class="row">
+      <button id="mic">🎙 Speak (ta-IN / en-US)</button>
+      <button id="parse" class="ghost">Parse</button>
+      <span class="muted">Nothing is sent at this step. Ever.</span>
+    </div>
+    <div id="parseOut"></div>
+  </div>
+
+  <div class="card" id="verifyCard" style="display:none">
+    <h2>2 · Verify every field</h2>
+    <div class="utter" id="utter"></div>
+    <div class="field"><label>Client name</label><input id="fClient" style="width:100%"></div>
+    <div class="field"><label>Amount</label><input id="fAmount" inputmode="decimal"></div>
+    <div class="field"><label>Currency - never guessed; pick it</label>
+      <select id="fCurrency"><option value="">UNRESOLVED - choose…</option></select>
+      <span class="pill warn" id="curHint" style="display:none"></span>
+    </div>
+    <div class="field"><label>Recipient email - never invented</label><input id="fEmail" style="width:100%" placeholder="name@example.com"></div>
+    <div class="field"><label>Description</label><input id="fDesc" style="width:100%"></div>
+    <div class="row">
+      <button id="useDemo" class="ghost">Use sandbox test recipient</button>
+      <button id="create">Create PayPal invoice (sandbox draft)</button>
+    </div>
+    <div id="createOut"></div>
+  </div>
+
+  <div class="card">
+    <h2>3 · Who owes me <button id="refresh" class="ghost" style="float:right">Refresh</button></h2>
+    <table id="invTable"><thead><tr><th>Client</th><th>Amount</th><th>Status</th><th>Age</th><th>Next step</th></tr></thead><tbody></tbody></table>
+    <div id="remOut"></div>
+  </div>
+
+  <p class="muted">Sandbox demo: all money movement is simulated inside PayPal's sandbox with fictional test identities. Nothing real is emailed, charged or owed.</p>
+</main>
+<script>
+let CFG = {}, PARSED = null;
+const $ = id => document.getElementById(id);
+async function api(path, method, body) {
+  const r = await fetch(path, { method: method || "GET", headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json();
+  if (!r.ok) { const e = new Error(j.error || r.status); e.payload = j; throw e; }
+  return j;
+}
+async function boot() {
+  CFG = await api("/api/config");
+  $("statusbar").textContent = "PayPal: " + (CFG.paypalConfigured ? "sandbox connected (" + CFG.merchant + ")" : "NOT configured") +
+    " · AI: " + (CFG.ai ? CFG.aiModel : "off (deterministic parser only)");
+  $("aiPill").textContent = CFG.ai ? "AI assist on" : "AI off";
+  $("aiPill").className = "pill " + (CFG.ai ? "ok" : "warn");
+  const sel = $("fCurrency");
+  CFG.isoCodes.forEach(c => { const o = document.createElement("option"); o.value = c; o.textContent = c; sel.appendChild(o); });
+  loadInvoices();
+}
+$("mic").onclick = () => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { alert("This browser has no SpeechRecognition; type instead."); return; }
+  const rec = new SR();
+  rec.lang = $("cmd").dataset.lang === "en-US" ? "ta-IN" : "en-US";
+  $("cmd").dataset.lang = rec.lang;
+  rec.onresult = e => { $("cmd").value = e.results[0][0].transcript; };
+  rec.start();
+};
+$("parse").onclick = async () => {
+  $("parseOut").innerHTML = "";
+  try {
+    const r = await api("/api/parse", "POST", { text: $("cmd").value });
+    PARSED = r.parsed;
+    $("verifyCard").style.display = "block";
+    $("utter").textContent = "Heard: “" + (PARSED.raw || "") + "” · parsed by: " + (PARSED.source === "ai" ? "AI (validated)" : "deterministic parser");
+    $("fClient").value = PARSED.client || "";
+    $("fAmount").value = PARSED.amount || "";
+    $("fDesc").value = PARSED.description || "";
+    $("fEmail").value = PARSED.email || "";
+    $("fCurrency").value = PARSED.currencyCode || "";
+    if (!PARSED.currencyResolved) {
+      $("curHint").style.display = "inline-block";
+      $("curHint").textContent = PARSED.currencyFamily ? "heard “" + PARSED.currencyFamily + "” - ambiguous, you must pick" : "no currency heard - you must pick";
+    } else $("curHint").style.display = "none";
+    if (r.draft && !r.draft.ready) $("parseOut").innerHTML = '<div class="bad">Blocked until resolved: ' + r.draft.missing.join(" · ") + "</div>";
+  } catch (e) { $("parseOut").innerHTML = '<div class="bad">' + (e.payload && e.payload.error || e.message) + " - rephrase with an amount</div>"; }
+};
+$("useDemo").onclick = () => { $("fEmail").value = CFG.demoRecipient; };
+$("create").onclick = async () => {
+  $("createOut").innerHTML = "";
+  try {
+    const r = await api("/api/invoices", "POST", {
+      parsed: PARSED, client: $("fClient").value, amount: $("fAmount").value,
+      currency: $("fCurrency").value, email: $("fEmail").value, description: $("fDesc").value
+    });
+    $("createOut").innerHTML = '<div class="pill ok">Sandbox invoice created: ' + r.invoice.paypalId + "</div>";
+    loadInvoices();
+  } catch (e) { $("createOut").innerHTML = '<div class="bad">' + (e.payload && (e.payload.missing || []).join(" · ") || e.message) + "</div>"; }
+};
+async function loadInvoices() {
+  const r = await api("/api/invoices");
+  const tb = document.querySelector("#invTable tbody");
+  tb.innerHTML = "";
+  r.invoices.slice().reverse().forEach(inv => {
+    const tr = document.createElement("tr");
+    const next = inv.status === "DRAFT" ? '<button data-a="send">Send (sandbox)</button>'
+      : inv.status === "SENT" ? '<button data-a="remind">Chase…</button> <button data-a="paid" class="ghost">Record payment</button>'
+      : "—";
+    tr.innerHTML = "<td><b>" + esc(inv.client) + "</b><br><span class='muted'>" + esc(inv.description) + "</span>" +
+      (inv.utterance ? "<br><span class='utter'>“" + esc(inv.utterance) + "”</span>" : "") + "</td>" +
+      "<td>" + esc(inv.amount) + " " + esc(inv.currency) + "</td>" +
+      '<td><span class="pill ' + (inv.status === "PAID" ? "ok" : "warn") + '">' + inv.status + "</span></td>" +
+      "<td>" + (inv.status === "PAID" ? "paid" : inv.ageDays + " d") + "</td><td>" + next + "</td>";
+    const cell = tr.lastChild;
+    cell.querySelectorAll("button").forEach(b => b.onclick = () => act(inv, b.dataset.a, cell));
+    tb.appendChild(tr);
+  });
+}
+async function act(inv, a, cell) {
+  try {
+    if (a === "send") { await api("/api/invoices/" + inv.id + "/send", "POST"); loadInvoices(); }
+    if (a === "paid") { await api("/api/invoices/" + inv.id + "/paid", "POST"); loadInvoices(); }
+    if (a === "remind") {
+      const d = await api("/api/invoices/" + inv.id + "/reminder-drafts");
+      const box = document.createElement("div");
+      box.className = "rem";
+      box.innerHTML = "<b>Pick the wording the client gets (" + d.to + ", " + d.ageDays + "d):</b><br>" +
+        ["gentle_en", "firm_en", "gentle_ta", "firm_ta"].map(t =>
+          '<label style="display:block;margin:6px 0"><input type="radio" name="tone' + inv.id + '" value="' + t + '"> <b>' + t + "</b>: " + esc(d.drafts[t]) + "</label>").join("") +
+        (d.ai_polished ? '<label style="display:block;margin:6px 0"><input type="radio" name="tone' + inv.id + '" value="__ai"> <b>AI polished</b>: ' + esc(d.ai_polished) + "</label>" : "") +
+        '<button>Approve & send reminder</button>';
+      box.querySelector("button").onclick = async () => {
+        const t = box.querySelector("input:checked");
+        if (!t) return alert("pick a wording first");
+        const note = t.value === "__ai" ? d.ai_polished : d.drafts[t.value];
+        await api("/api/invoices/" + inv.id + "/remind", "POST", { note });
+        box.remove(); loadInvoices();
+      };
+      $("remOut").appendChild(box);
+    }
+  } catch (e) { alert(e.message); }
+}
+$("refresh").onclick = loadInvoices;
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+boot();
+</script>
+</body>
+</html>
