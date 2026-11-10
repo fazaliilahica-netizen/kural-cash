@@ -26,7 +26,7 @@ const isStop = t => STOP.has(t.toLowerCase());
 
 function validateAmount(a) {
   const s = String(a == null ? "" : a).replace(/,/g, "");
-  if (!AMOUNT_RE.test(String(a == null ? "" : a)) && !/^\d+(\.\d{1,2})?$/.test(s)) return null;
+  if (!AMOUNT_RE.test(String(a == null ? "" : a))) return null;
   if (!(parseFloat(s) > 0)) return null;
   return s;
 }
@@ -118,8 +118,11 @@ async function aiParseCommand(raw, gemini) {
   if (!obj || typeof obj !== "object") return null;
   const amount = validateAmount(obj.amount);
   if (!amount) return null; // fail-closed: no trustworthy amount, no draft
-  const currencyCode = validateCurrency(obj.currency);
-  const email = validateEmail(obj.email);
+  // Resolve these only from literal input, never from model inventions.
+  const rawTokens = String(raw || "").trim().split(/\s+/);
+  const currencies = [...new Set(rawTokens.map(validateCurrency).filter(Boolean))];
+  const currencyCode = currencies.length === 1 ? currencies[0] : null;
+  const email = rawTokens.map(validateEmail).find(Boolean) || null;
   const client = (typeof obj.client === "string" && obj.client.trim()) ? obj.client.trim().slice(0, 60) : "Client";
   const description = (typeof obj.description === "string" && obj.description.trim()) ? obj.description.trim().slice(0, 200) : "Services rendered";
   return {

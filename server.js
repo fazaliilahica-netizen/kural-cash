@@ -54,7 +54,7 @@ const server = http.createServer(async (req, res) => {
 
         // 2) Worker verified every field -> create the REAL sandbox draft invoice
         if (req.method === "POST" && url.pathname === "/api/invoices") {
-          const p = data.parsed || {};
+          const p = { ...(data.parsed || {}), client: String(data.client || data.parsed?.client || "Client").slice(0, 60), description: String(data.description || data.parsed?.description || "Services rendered").slice(0, 200) };
           const currency = validateCurrency(data.currency || p.currencyCode);
           const email = validateEmail(data.email || p.email);
           const amount = validateAmount(data.amount || p.amount);
@@ -102,7 +102,7 @@ const server = http.createServer(async (req, res) => {
               try {
                 aiNote = await gemini.generateText(
                   "Polish this payment reminder so it is warm, professional and at most 2 sentences. " +
-                  "Keep the exact amount, currency and description unchanged. Language: English. Text: " +
+                  "Keep the exact amount, currency and description unchanged. Do not claim the invoice is due, overdue, or late: its due date has not been verified. Language: English. Text: " +
                   JSON.stringify(url.searchParams.get("tone") === "firm" ? d.drafts.firm_en : d.drafts.gentle_en));
               } catch (e) { aiNote = null; }
             }

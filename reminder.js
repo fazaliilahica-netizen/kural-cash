@@ -1,14 +1,15 @@
 // Get-paid agent: aging + worker-approved reminder drafts. Fail-closed like the invoice path:
 // a reminder is never drafted when currency is unresolved or the recipient is unknown,
 // and amounts/currency are inserted ONLY from the stored invoice record - never re-parsed or invented.
+// Invoice age is not a due date. Do not claim due/overdue without verified payment terms.
 const TONES = {
   gentle: {
     en: (v) => `Hi ${v.client}, just a gentle note that the invoice for "${v.description}" (${v.amount} ${v.currency}) is still open. No rush - thank you!`,
     ta: (v) => `வணக்கம் ${v.client}, "${v.description}" இன்வாய்ஸ் (${v.amount} ${v.currency}) இன்னும் நிலுவையில் உளது. அவசரமில்லை - நன்றி!`
   },
   firm: {
-    en: (v) => v.ageDays > 0 ? `Hello ${v.client}, the invoice for "${v.description}" (${v.amount} ${v.currency}) is ${v.ageDays} day(s) overdue. Please arrange payment this week. Thank you.` : `Hello ${v.client}, the invoice for "${v.description}" (${v.amount} ${v.currency}) is now due. Please arrange payment this week. Thank you.`,
-    ta: (v) => v.ageDays > 0 ? `வணக்கம் ${v.client}, "${v.description}" இன்வாய்ஸ் (${v.amount} ${v.currency}) ${v.ageDays} நாட்கள் தாமதமாகி உளது. இந்த வாரம் செலுத்த ஏற்பாடு செய்யவும். நன்றி.` : `வணக்கம் ${v.client}, "${v.description}" இன்வாய்ஸ் (${v.amount} ${v.currency}) இப்போது செலுத்த வேண்டியது. இந்த வாரம் ஏற்பாடு செய்யவும். நன்றி.`
+    en: (v) => `Hello ${v.client}, please review the open invoice for "${v.description}" (${v.amount} ${v.currency}) and arrange payment when possible. Thank you.`,
+    ta: (v) => `வணக்கம் ${v.client}, "${v.description}" இன்வாய்ஸ் (${v.amount} ${v.currency}) இன்னும் நிலுவையில் உள்ளது. தயவுசெய்து சரிபார்த்து இயன்றபோது செலுத்த ஏற்பாடு செய்யவும். நன்றி.`
   }
 };
 function ageDays(invoice, now) {

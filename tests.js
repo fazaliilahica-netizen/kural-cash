@@ -1,6 +1,6 @@
 // Fail-closed policy tests. Run: node tests.js (no network, no credentials).
 const assert = require("assert");
-const { parseCommand, toPayPalDraft, validateAmount, validateCurrency, validateEmail } = require("./parser.js");
+const { parseCommand, aiParseCommand, toPayPalDraft, validateAmount, validateCurrency, validateEmail } = require("./parser.js");
 const { reminderDrafts, ageDays } = require("./reminder.js");
 
 let n = 0;
@@ -102,6 +102,13 @@ t("aging counts from sent/created, 0 when paid", () => {
   assert.strictEqual(ageDays({ ...inv, paidAt: new Date(now).toISOString() }, now), 0);
 });
 
+t("invoice age never implies an unverified due date", () => {
+  const inv = { id: 1, client: "Meera", amount: "80", currency: "CAD", currencyResolved: true, email: "m@x.co", description: "logo design", createdAt: new Date(Date.now() - 30 * 86400000).toISOString() };
+  const d = reminderDrafts(inv);
+  assert.ok(!/overdue|now due|late/i.test(d.drafts.firm_en));
+  assert.ok(!/தாமத|இப்போது செலுத்த வேண்டியது/.test(d.drafts.firm_ta));
+});
+
 // --- PayPal body shape ---
 t("draft body shape matches Invoicing v2", () => {
   const p = parseCommand("invoice Meera 80 CAD logo design to meera@example.com");
@@ -111,4 +118,18 @@ t("draft body shape matches Invoicing v2", () => {
   assert.strictEqual(d.body.items.length, 1);
 });
 
-console.log(n + "/" + n + " tests passed");
+t("edited review fields reach PayPal body", () => {
+  const p = {...parseCommand("invoice Meera 80 CAD design to a@b.co"), client: "Reviewed Client", description: "Reviewed service"};
+  const d = toPayPalDraft(p);
+  assert.strictEqual(d.body.primary_recipients[0].billing_info.name.full_name, "Reviewed Client");
+  assert.strictEqual(d.body.items[0].name, "Reviewed service");
+});
+t("amount validator rejects malformed grouping", () => assert.strictEqual(validateAmount("1,50"), null));
+(async () => {
+  const fake = { available:()=>true, generateJSON:async()=>({amount:"1500",currency:"INR",email:"invented@example.com",client:"Ramesh",description:"work"}) };
+  const p = await aiParseCommand("ரமேஷ் ஆயிரத்து ஐநூறு ரூபாய்", fake);
+  assert.strictEqual(p.currencyCode,null); assert.strictEqual(p.email,null); n++;
+  const q = await aiParseCommand("ரமேஷ் ஆயிரத்து ஐநூறு CAD actual@example.com", fake);
+  assert.strictEqual(q.currencyCode,"CAD"); assert.strictEqual(q.email,"actual@example.com"); n++;
+  console.log(n + "/" + n + " tests passed");
+})().catch(e=>{console.error(e);process.exit(1)});
