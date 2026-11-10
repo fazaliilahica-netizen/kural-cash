@@ -4,9 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kural Cash - get paid in your own language</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;600&display=swap">
 <style>
   :root { --ink:#1c2530; --mut:#5b6876; --line:#dfe6ee; --ok:#0c7a4b; --warn:#9a5b00; --bad:#b3261e; --brand:#0a4d8c; }
-  * { box-sizing:border-box; font-family:-apple-system,"Segoe UI",Roboto,Noto Sans,Tamil Sangam MN,sans-serif; }
+  * { box-sizing:border-box; font-family:-apple-system,"Segoe UI",Roboto,"Noto Sans","Noto Sans Tamil","Tamil Sangam MN",sans-serif; }
   body { margin:0; background:#f5f8fb; color:var(--ink); }
   header { background:var(--brand); color:#fff; padding:14px 20px; }
   header h1 { margin:0; font-size:19px; }
@@ -21,6 +24,8 @@
   .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
   .pill { display:inline-block; font-size:11px; padding:2px 8px; border-radius:99px; background:#eef3f8; color:var(--mut); }
   .pill.ok { background:#e3f5ec; color:var(--ok); } .pill.warn { background:#fdf1de; color:var(--warn); }
+  .table-wrap { overflow-x:auto; }
+  td:first-child { overflow-wrap:anywhere; }
   table { width:100%; border-collapse:collapse; font-size:13px; }
   th, td { text-align:left; padding:7px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
   input, select { font-size:14px; padding:7px; border:1px solid var(--line); border-radius:7px; }
@@ -70,7 +75,7 @@
 
   <div class="card">
     <h2>3 · Who owes me <button id="refresh" class="ghost" style="float:right">Refresh</button></h2>
-    <table id="invTable"><thead><tr><th>Client</th><th>Amount</th><th>Status</th><th>Age</th><th>Next step</th></tr></thead><tbody></tbody></table>
+    <div class="table-wrap"><table id="invTable"><thead><tr><th>Client</th><th>Amount</th><th>Status</th><th>Age</th><th>Next step</th></tr></thead><tbody></tbody></table></div>
     <div id="remOut"></div>
   </div>
 
@@ -132,6 +137,7 @@ $("create").onclick = async () => {
       currency: $("fCurrency").value, email: $("fEmail").value, description: $("fDesc").value
     });
     $("createOut").innerHTML = '<div class="pill ok">Sandbox invoice created: ' + r.invoice.paypalId + "</div>";
+    $("parseOut").innerHTML = "";
     loadInvoices();
   } catch (e) { $("createOut").innerHTML = '<div class="bad">' + (e.payload && (e.payload.missing || []).join(" · ") || e.message) + "</div>"; }
 };
