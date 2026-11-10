@@ -34,12 +34,25 @@
   .rem { background:#f8fafc; border:1px dashed var(--line); border-radius:8px; padding:10px; margin-top:8px; font-size:13px; white-space:pre-wrap; }
   .utter { font-size:12px; color:var(--mut); font-style:italic; }
   #statusbar { font-size:12px; color:var(--mut); margin-bottom:10px; }
+  @media (max-width:600px) {
+    #invTable, #invTable tbody { display:block; width:100%; }
+    #invTable thead { display:none; }
+    #invTable tr { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px; padding:10px 0; border-bottom:1px solid var(--line); }
+    #invTable td { display:block; border:0; padding:3px; overflow-wrap:anywhere; }
+    #invTable td:first-child { grid-column:1 / -1; }
+    #invTable td::before { display:block; font-weight:600; color:var(--mut); font-size:11px; margin-bottom:4px; }
+    #invTable td:nth-child(1)::before { content:"Client"; }
+    #invTable td:nth-child(2)::before { content:"Amount"; }
+    #invTable td:nth-child(3)::before { content:"Status"; }
+    #invTable td:nth-child(4)::before { content:"Age"; }
+    #invTable td:nth-child(5)::before { content:"Next step"; }
+  }
 </style>
 </head>
 <body>
 <header>
   <h1>Kural Cash</h1>
-  <p>The get-paid agent for people who never had an accounts department. Speak in Tamil or English - it never invents an amount, a currency, or a recipient.</p>
+  <p>The get-paid agent for people who never had an accounts department. Speak or type in Tamil or English. Review the amount, currency and recipient before PayPal actions.</p>
 </header>
 <main>
   <div id="statusbar">loading…</div>
@@ -153,8 +166,8 @@ async function loadInvoices() {
     tr.innerHTML = "<td><b>" + esc(inv.client) + "</b><br><span class='muted'>" + esc(inv.description) + "</span>" +
       (inv.utterance ? "<br><span class='utter'>“" + esc(inv.utterance) + "”</span>" : "") + "</td>" +
       "<td>" + esc(inv.amount) + " " + esc(inv.currency) + "</td>" +
-      '<td><span class="pill ' + (inv.status === "PAID" ? "ok" : "warn") + '">' + inv.status + "</span></td>" +
-      "<td>" + (inv.status === "PAID" ? "paid" : inv.ageDays + " d") + "</td><td>" + next + "</td>";
+      '<td><span class="pill ' + (["PAID", "MARKED_AS_PAID"].includes(inv.status) ? "ok" : "warn") + '">' + inv.status + "</span></td>" +
+      "<td>" + (["PAID", "MARKED_AS_PAID"].includes(inv.status) ? "paid" : inv.ageDays + " d") + "</td><td>" + next + "</td>";
     const cell = tr.lastChild;
     cell.querySelectorAll("button").forEach(b => b.onclick = () => act(inv, b.dataset.a, cell));
     tb.appendChild(tr);

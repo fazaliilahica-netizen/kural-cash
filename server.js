@@ -74,17 +74,17 @@ const server = http.createServer(async (req, res) => {
         if (req.method === "GET" && url.pathname === "/api/invoices") {
           // sync status from PayPal (best-effort; local record stays authoritative for UI)
           for (const inv of db.invoices) {
-            if (!inv.paypalId || inv.status === "PAID") continue;
+            if (!inv.paypalId) continue;
             try {
               const remote = await paypal.getInvoice(inv.paypalId);
               if (remote && remote.status && remote.status !== inv.status) {
                 inv.status = remote.status;
-                if (remote.status === "PAID") inv.paidAt = new Date().toISOString();
+                if (["PAID", "MARKED_AS_PAID"].includes(remote.status)) inv.paidAt = new Date().toISOString();
               }
             } catch (e) {}
           }
           save();
-          const view = db.invoices.map(i => ({ ...i, ageDays: i.status === "PAID" ? 0 : ageDays(i) }));
+          const view = db.invoices.map(i => ({ ...i, ageDays: ["PAID", "MARKED_AS_PAID"].includes(i.status) ? 0 : ageDays(i) }));
           return json(res, 200, { invoices: view });
         }
 
@@ -124,7 +124,8 @@ const server = http.createServer(async (req, res) => {
           }
           if (req.method === "POST" && action === "paid") {
             await paypal.recordPayment(inv.paypalId, inv.amount, inv.currency);
-            inv.status = "PAID"; inv.paidAt = new Date().toISOString(); save();
+            const remote = await paypal.getInvoice(inv.paypalId);
+            inv.status = remote.status; inv.paidAt = ["PAID", "MARKED_AS_PAID"].includes(remote.status) ? new Date().toISOString() : null; save();
             return json(res, 200, { invoice: inv });
           }
         }

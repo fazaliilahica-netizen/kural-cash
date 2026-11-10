@@ -3,7 +3,7 @@
 **The get-paid agent for people who never had an accounts department.**
 
 A bilingual (Tamil + English) voice-first invoicing agent built on the **PayPal Invoicing v2 API**
-with a strict fail-closed money policy: **it never invents an amount, a currency, or a recipient.**
+with explicit review of **the amount, currency and recipient before PayPal actions.**
 An AI model (Google Gemini) helps it understand free-form speech in any language - but the
 deterministic safety layer always has the final word on money.
 
